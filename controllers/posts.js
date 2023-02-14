@@ -101,7 +101,7 @@ postRouter.post('/', validatePostData, userExtractor, async (request, response, 
         const newPost = new Post({
             content,
             img: imgPost,
-            date: new Date().toLocaleString(),
+            date: new Date(),
             user: user.toJSON().id,
             likesNumber: 0
         })

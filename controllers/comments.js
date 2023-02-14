@@ -50,7 +50,7 @@ commentsRouter.post('/comments/:id', validateCommentData, userExtractor, async (
             author: user.username,
             user: user.toJSON().id,
             post: post._id,
-            date: new Date().toLocaleString()
+            date: new Date()
         })
 
         const saveComment = await newComment.save()

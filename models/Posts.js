@@ -2,9 +2,11 @@ const mongoose = require('mongoose')
 const { Schema, model } = mongoose
 
 const postSchema = new Schema({
+    title:String,
     content: String,
-    img: String,
     date: Date,
+    cover:String,
+    tags:Array,
     likesBy: [
         {
             type: Schema.Types.ObjectId,

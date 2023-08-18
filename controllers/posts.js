@@ -1,10 +1,16 @@
 const postRouter = require('express').Router()
+const upload = require('../middleware/Multer');
 const validatePostData = require('../middleware/useValidatePostData');
 const userExtractor = require('../middleware/userExtractor')
 const Post = require('../models/Posts')
 const User = require('../models/User');
 
+const fs=require('fs')
+
+
+
 postRouter.get('/', async (request, response, next) => {
+    
     try {
         const posts = await Post.find({}).populate('user', {
             username: 1,
@@ -14,7 +20,7 @@ postRouter.get('/', async (request, response, next) => {
             content: 1,
             user: 1,
             author: 1
-        })
+        }).sort({date:-1})
 
         response.json(posts)
     } catch (error) {
@@ -90,17 +96,25 @@ postRouter.delete('/:id', userExtractor, async (request, response, next) => {
     }
 })
 
-postRouter.post('/', validatePostData, userExtractor, async (request, response, next) => {
-    const { content, imgPost } = await request.body
-    const { userId } = await request
-
+postRouter.post('/', userExtractor,upload.single('file'), async (request, response, next) => {
+    const { content,title,tags } = await request.body
+    const { userId } = request
+    const {originalname,path}=request.file
+    const parts= originalname.split('.')
+    const ext= parts[parts.length - 1]
+    const newPath= path + '.' + ext
+    fs.renameSync(path,newPath)
+    
+    
     try {
 
         const user = await User.findById(userId)
 
         const newPost = new Post({
+            cover:newPath, 
+            title,
             content,
-            img: imgPost,
+            tags:tags.split(','),
             date: new Date(),
             user: user.toJSON().id,
             likesNumber: 0
@@ -113,6 +127,7 @@ postRouter.post('/', validatePostData, userExtractor, async (request, response, 
         response.json(savePost)
 
     } catch (error) {
+        console.log(request)
         next(error)
     }
 

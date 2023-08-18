@@ -38,7 +38,7 @@ commentsRouter.delete('/comments/:id', userExtractor, async (req, res, next) => 
 commentsRouter.post('/comments/:id', validateCommentData, userExtractor, async (req, res, next) => {
 
     const { content } = await req.body
-    const { userId } = await req
+    const { userId } =  req
     const id = req.params.id
     try {
         const objectId = new ObjectId(id)

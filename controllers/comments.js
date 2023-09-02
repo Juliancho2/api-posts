@@ -10,13 +10,19 @@ const commentsRouter = require('express').Router()
 
 commentsRouter.get('/:idPost/comments/', async (req, res) => {
     const { idPost } = req.params
-    const post = await Post.findById(idPost).populate('comments', {
-        content: 1,
-        user: 1,
-        author: 1,
-        date: 1
-    })
-    res.json(post.comments)
+    try {
+        const post = await Post.findById(idPost).populate('comments', {
+            content: 1,
+            user: 1,
+            author: 1,
+            date: 1
+        })
+        if (!post || post.length === 0) return res.status(400).json({ message: "Not found post" })
+
+        res.json(post.comments)
+    } catch (err) {
+        res.status(500).json({ error: 'Server error' });
+    }
 })
 
 commentsRouter.delete('/comments/:id', userExtractor, async (req, res, next) => {
@@ -38,7 +44,7 @@ commentsRouter.delete('/comments/:id', userExtractor, async (req, res, next) => 
 commentsRouter.post('/comments/:id', validateCommentData, userExtractor, async (req, res, next) => {
 
     const { content } = await req.body
-    const { userId } =  req
+    const { userId } = req
     const id = req.params.id
     try {
         const objectId = new ObjectId(id)

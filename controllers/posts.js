@@ -1,16 +1,17 @@
+require('dotenv').config()
+
 const postRouter = require('express').Router()
+const cloudinary = require('../cloudinary/index');
 const upload = require('../middleware/Multer');
 const validatePostData = require('../middleware/useValidatePostData');
 const userExtractor = require('../middleware/userExtractor')
 const Post = require('../models/Posts')
 const User = require('../models/User');
 
-const fs=require('fs')
+const fs = require('fs')
 
+postRouter.get('/', async (request, response) => {
 
-
-postRouter.get('/', async (request, response, next) => {
-    
     try {
         const posts = await Post.find({}).populate('user', {
             username: 1,
@@ -20,11 +21,11 @@ postRouter.get('/', async (request, response, next) => {
             content: 1,
             user: 1,
             author: 1
-        }).sort({date:-1})
+        }).sort({ date: -1 })
 
         response.json(posts)
     } catch (error) {
-        next(error)
+        return res.status(404).json({ message: "There was a problem getting the posts" })
     }
 
 })
@@ -44,7 +45,7 @@ postRouter.get('/:id', async (request, response, next) => {
         response.json(post)
 
     } catch (error) {
-        next(error)
+        return res.status(404).json({ message: "Not found" })
     }
 
 
@@ -92,46 +93,78 @@ postRouter.delete('/:id', userExtractor, async (request, response, next) => {
             response.status(204).end()
         } else response.status(401).end()
     } catch (error) {
-        next(error)
+        response.status(401).json({ message: "An ocurred error to deleting post" })
     }
 })
+postRouter.put('/:id', userExtractor, async (request, response) => {
+    try {
+        const postId = request.params.id;
+        const updatedPostData = request.body;
 
-postRouter.post('/', userExtractor,upload.single('file'), async (request, response, next) => {
-    const { content,title,tags } = await request.body
-    const { userId } = request
-    const {originalname,path}=request.file
-    const parts= originalname.split('.')
-    const ext= parts[parts.length - 1]
-    const newPath= path + '.' + ext
-    fs.renameSync(path,newPath)
-    
+        // Realizar la actualización en la base de datos
+        const updatedPost = await Post.findByIdAndUpdate(postId, updatedPostData, {
+            new: true, // Devuelve el objeto actualizado en lugar del anterior
+        });
+
+        if (!updatedPost) {
+            return response.status(404).json({ error: 'Post not found' });
+        }
+
+        // Enviar la respuesta con el post actualizado
+        response.json(updatedPost);
+    } catch (error) {
+        // Manejar errores, por ejemplo, si hay un error de validación o de base de datos
+        response.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
+postRouter.post('/', userExtractor, upload.single("file"), validatePostData,async (request, response, next) => {
+    const { content, title, tags } = request.body;
+    const { userId } = request;
+
+    let originalname = '';
+    let path = '';
+    let parts='';
+    let ext=''
+    let newPath=''
+
+    if(request.file) {
+        originalname = request.file.originalname;
+        path = request.file.path;
+        parts = originalname.split('.')
+        ext = parts[parts.length - 1]
+        newPath = path + '.' + ext
+        fs.renameSync(path, newPath)
+    }
     
     try {
-
-        const user = await User.findById(userId)
-
+        let uploadResult=''
+        // Sube la imagen a Cloudinary
+        if(originalname.trim().length > 0){
+             uploadResult = await cloudinary.uploader.upload(`./${newPath}`);
+        }
         const newPost = new Post({
-            cover:newPath, 
+            cover: uploadResult ? uploadResult.url : uploadResult, 
             title,
             content,
-            tags:tags.split(','),
+            tags: tags.split(','),
             date: new Date(),
-            user: user.toJSON().id,
-            likesNumber: 0
-        })
+            user: userId,
+            likesNumber: 0,
+        });
 
-        const savePost = await newPost.save()
-        user.posts = user.posts.concat(savePost._id)
-        await user.save()
+        const savedPost = await newPost.save();
 
-        response.json(savePost)
+        //   Actualiza el usuario con la nueva publicación
+        const user = await User.findById(userId);
+        user.posts = user.posts.concat(savedPost._id);
+        await user.save();
 
+        response.json(savedPost);
     } catch (error) {
-        console.log(request)
-        next(error)
+        response.status(500).json({ error: 'Error interno del servidor' });
     }
-
-})
+});
 
 
 module.exports = postRouter
